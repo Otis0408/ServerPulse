@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+build/
+dist/
+*.egg-info/
+.eggs/
+*.icns
+traffic_data.json
+client/venv/
+client/build/
+client/dist/
+client/icon.icns
+.DS_Store
