@@ -27,6 +27,7 @@ class MetricsCollector:
     def __init__(self):
         self._prev_net = None
         self._prev_time = None
+        self._prev_cpu = None
 
     def collect(self):
         m = {}
@@ -41,16 +42,26 @@ class MetricsCollector:
         return m
 
     def _cpu(self):
+        """Calculate CPU usage from /proc/stat delta between two readings."""
         try:
-            out = subprocess.check_output(
-                ["top", "-bn1"], stderr=subprocess.DEVNULL, timeout=5
-            ).decode()
-            for line in out.splitlines():
-                if "%Cpu" in line:
-                    for part in line.split(","):
-                        if "id" in part:
-                            idle = float(part.split()[0])
-                            return {"usage": round(100.0 - idle, 1)}
+            with open("/proc/stat") as f:
+                line = f.readline()
+            parts = line.split()
+            # user, nice, system, idle, iowait, irq, softirq, steal
+            vals = [int(x) for x in parts[1:9]]
+            total = sum(vals)
+            idle = vals[3] + vals[4]  # idle + iowait
+
+            if self._prev_cpu:
+                prev_total, prev_idle = self._prev_cpu
+                d_total = total - prev_total
+                d_idle = idle - prev_idle
+                usage = ((d_total - d_idle) / d_total * 100) if d_total > 0 else 0
+            else:
+                usage = 0
+
+            self._prev_cpu = (total, idle)
+            return {"usage": round(usage, 1)}
         except Exception:
             pass
         return {"usage": 0.0}
@@ -126,8 +137,18 @@ class MetricsCollector:
 
     def _uptime(self):
         try:
-            out = subprocess.check_output(["uptime", "-p"], timeout=5).decode().strip()
-            return out
+            with open("/proc/uptime") as f:
+                secs = float(f.read().split()[0])
+            days = int(secs // 86400)
+            hours = int((secs % 86400) // 3600)
+            minutes = int((secs % 3600) // 60)
+            parts = []
+            if days > 0:
+                parts.append(f"{days}天")
+            if hours > 0:
+                parts.append(f"{hours}小时")
+            parts.append(f"{minutes}分钟")
+            return " ".join(parts)
         except Exception:
             return "N/A"
 

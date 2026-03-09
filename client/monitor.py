@@ -296,7 +296,7 @@ class ServerPulseApp(rumps.App):
             except Exception:
                 pass
             set_attr(self.header_item, [
-                (f"  {self.host}", 13, NSColor.labelColor()),
+                (f"  {self.host}", 13, NSColor.blackColor()),
                 ("  ●  断开", 12, NSColor.systemRedColor()),
             ])
 
@@ -315,11 +315,11 @@ class ServerPulseApp(rumps.App):
             self.title = f"↓{fmt_speed_short(rx_speed)} ↑{fmt_speed_short(tx_speed)}"
 
         # ── Colors for menu items ──
-        # Use high-contrast colors that work in both light/dark mode
-        label = NSColor.labelColor()              # Primary text (white in dark, black in light)
-        sub = NSColor.tertiaryLabelColor()        # Dimmed label text
-        cyan = NSColor.systemCyanColor()          # Download
-        pink = NSColor.systemPinkColor()          # Upload
+        # Force high-contrast colors for readability
+        black = NSColor.blackColor()              # Primary text - always black
+        darkgray = NSColor.darkGrayColor()        # Secondary text
+        cyan = NSColor.systemBlueColor()          # Download (blue more readable than cyan)
+        pink = NSColor.systemRedColor()           # Upload (red more readable than pink)
         green = NSColor.systemGreenColor()
         sz = 12.5   # Main font size
         sm = 10.5   # Small font size
@@ -327,8 +327,8 @@ class ServerPulseApp(rumps.App):
         # Header
         hostname = m.get("hostname", self.host)
         set_attr(self.header_item, [
-            (f"  {hostname}", 13, label),
-            (f"  ({self.host})", 11, sub),
+            (f"  {hostname}", 13, black),
+            (f"  ({self.host})", 11, darkgray),
             ("  ●", 11, green),
         ])
 
@@ -336,7 +336,7 @@ class ServerPulseApp(rumps.App):
         cpu_pct = m.get("cpu", {}).get("usage", 0)
         cpu_c = color_for_pct(cpu_pct)
         set_attr(self.cpu_item, [
-            ("  CPU    ", sz, label),
+            ("  CPU    ", sz, black),
             (f"{cpu_pct:5.1f}%  ", sz, cpu_c),
             (bar_text(cpu_pct), 9, cpu_c),
         ])
@@ -346,10 +346,10 @@ class ServerPulseApp(rumps.App):
         mem_pct = mem.get("usage", 0)
         mem_c = color_for_pct(mem_pct)
         set_attr(self.mem_item, [
-            ("  内存   ", sz, label),
+            ("  内存   ", sz, black),
             (f"{mem_pct:5.1f}%  ", sz, mem_c),
             (bar_text(mem_pct), 9, mem_c),
-            (f"  {fmt_bytes(mem.get('used', 0))}/{fmt_bytes(mem.get('total', 0))}", sm, sub),
+            (f"  {fmt_bytes(mem.get('used', 0))}/{fmt_bytes(mem.get('total', 0))}", sm, darkgray),
         ])
 
         # Disk
@@ -357,32 +357,32 @@ class ServerPulseApp(rumps.App):
         disk_pct = disk.get("usage", 0)
         disk_c = color_for_pct(disk_pct)
         set_attr(self.disk_item, [
-            ("  硬盘   ", sz, label),
+            ("  硬盘   ", sz, black),
             (f"{disk_pct:5.1f}%  ", sz, disk_c),
             (bar_text(disk_pct), 9, disk_c),
-            (f"  {fmt_bytes(disk.get('used', 0))}/{fmt_bytes(disk.get('total', 0))}", sm, sub),
+            (f"  {fmt_bytes(disk.get('used', 0))}/{fmt_bytes(disk.get('total', 0))}", sm, darkgray),
         ])
 
         # Network
         set_attr(self.net_item, [
-            ("  网络   ", sz, label),
+            ("  网络   ", sz, black),
             (f"↓{fmt_speed(rx_speed)}", sz, cyan),
-            ("  ", sz, label),
+            ("  ", sz, black),
             (f"↑{fmt_speed(tx_speed)}", sz, pink),
-            (f"  ({net.get('iface', '?')})", sm, sub),
+            (f"  ({net.get('iface', '?')})", sm, darkgray),
         ])
 
         # Load
         load = m.get("load", {})
         set_attr(self.load_item, [
-            ("  负载   ", sz, label),
-            (f"{load.get('1m', '?')}  {load.get('5m', '?')}  {load.get('15m', '?')}", sz, label),
+            ("  负载   ", sz, black),
+            (f"{load.get('1m', '?')}  {load.get('5m', '?')}  {load.get('15m', '?')}", sz, black),
         ])
 
         # Uptime
         set_attr(self.uptime_item, [
-            ("  运行   ", sz, label),
-            (m.get("uptime", "N/A"), sz, label),
+            ("  运行   ", sz, black),
+            (m.get("uptime", "N/A"), sz, black),
         ])
 
         # Traffic
@@ -394,10 +394,10 @@ class ServerPulseApp(rumps.App):
         except Exception:
             return
 
-        label = NSColor.labelColor()
-        sub = NSColor.tertiaryLabelColor()
-        cyan = NSColor.systemCyanColor()
-        pink = NSColor.systemPinkColor()
+        label = NSColor.blackColor()
+        sub = NSColor.darkGrayColor()
+        cyan = NSColor.systemBlueColor()
+        pink = NSColor.systemRedColor()
 
         for s in self.traffic_store.get_predefined_stats():
             item = rumps.MenuItem("")
