@@ -197,21 +197,22 @@ class ServerPulseApp(rumps.App):
         if cfg:
             self.host, self.port, self.token = cfg["host"], cfg["port"], cfg["token"]
 
-        # Menu Items
-        self.header_item = rumps.MenuItem("")
+        # Menu Items — all have callback so macOS renders them as enabled (black text)
+        noop = lambda _: None
+        self.header_item = rumps.MenuItem("", callback=noop)
         self.sep1 = rumps.separator
 
-        self.cpu_item = rumps.MenuItem("CPU  ──")
-        self.mem_item = rumps.MenuItem("内存  ──")
-        self.disk_item = rumps.MenuItem("硬盘  ──")
-        self.net_item = rumps.MenuItem("网络  ──")
+        self.cpu_item = rumps.MenuItem("CPU  ──", callback=noop)
+        self.mem_item = rumps.MenuItem("内存  ──", callback=noop)
+        self.disk_item = rumps.MenuItem("硬盘  ──", callback=noop)
+        self.net_item = rumps.MenuItem("网络  ──", callback=noop)
         self.sep_detail = rumps.separator
-        self.load_item = rumps.MenuItem("负载  ──")
-        self.uptime_item = rumps.MenuItem("运行  ──")
+        self.load_item = rumps.MenuItem("负载  ──", callback=noop)
+        self.uptime_item = rumps.MenuItem("运行  ──", callback=noop)
 
         self.sep2 = rumps.separator
-        self.traffic_today = rumps.MenuItem("今日流量  ──")
-        self.traffic_total = rumps.MenuItem("累计流量  ──")
+        self.traffic_today = rumps.MenuItem("今日流量  ──", callback=noop)
+        self.traffic_total = rumps.MenuItem("累计流量  ──", callback=noop)
 
         self.sep3 = rumps.separator
         self.connect_item = rumps.MenuItem("🔗 输入连接码", callback=self.on_connect)
