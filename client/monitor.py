@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 ServerPulse - macOS Menu Bar Monitor
-Beautiful, compact server performance monitoring.
 """
 
 import rumps
@@ -27,20 +26,12 @@ CONFIG_DIR = os.path.expanduser("~/Library/Application Support/ServerPulse")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 POLL_INTERVAL = 3
 
-# ─── Fixed Colors (explicit RGBA, not system semantic colors) ───
-CLR_BLACK = NSColor.colorWithSRGBRed_green_blue_alpha_(0.0, 0.0, 0.0, 1.0)
-CLR_DARK = NSColor.colorWithSRGBRed_green_blue_alpha_(0.25, 0.25, 0.25, 1.0)
-CLR_BLUE = NSColor.colorWithSRGBRed_green_blue_alpha_(0.0, 0.35, 0.85, 1.0)
-CLR_RED = NSColor.colorWithSRGBRed_green_blue_alpha_(0.85, 0.15, 0.15, 1.0)
-CLR_GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.70, 0.15, 1.0)
+# Colors for accent elements only
+CLR_GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.68, 0.15, 1.0)
 CLR_YELLOW = NSColor.colorWithSRGBRed_green_blue_alpha_(0.80, 0.65, 0.0, 1.0)
-CLR_ORANGE = NSColor.colorWithSRGBRed_green_blue_alpha_(0.90, 0.45, 0.0, 1.0)
-CLR_WHITE = NSColor.whiteColor()
-
-# Font weights
-WEIGHT_MEDIUM = 0.23    # Medium
-WEIGHT_SEMIBOLD = 0.3   # Semibold
-WEIGHT_BOLD = 0.4       # Bold
+CLR_ORANGE = NSColor.colorWithSRGBRed_green_blue_alpha_(0.90, 0.40, 0.0, 1.0)
+CLR_RED = NSColor.colorWithSRGBRed_green_blue_alpha_(0.88, 0.12, 0.12, 1.0)
+CLR_BLUE = NSColor.colorWithSRGBRed_green_blue_alpha_(0.0, 0.35, 0.85, 1.0)
 
 
 # ─── Formatting ───
@@ -102,25 +93,41 @@ def color_for_pct(pct):
         return CLR_RED
 
 
-# ─── Attributed String Helpers ───
+# ─── Attributed String (uses system menu font to match native items) ───
 
-def make_attr(segments):
-    """Create NSAttributedString from [(text, size, weight, color), ...]"""
+def _menu_font(size=0, bold=False):
+    """Get the system menu font. size=0 means system default."""
+    if bold:
+        return NSFont.boldSystemFontOfSize_(size)
+    return NSFont.menuFontOfSize_(size)
+
+
+def _mono_font(size=10):
+    return NSFont.monospacedSystemFontOfSize_weight_(size, 0.0)
+
+
+def set_title(item, segments):
+    """Set attributed title on a menu item.
+    segments = [(text, color_or_None, mono_size_or_None), ...]
+    color=None means controlTextColor (system default black).
+    mono_size=None means use system menu font, otherwise monospaced at given size.
+    """
     result = NSMutableAttributedString.alloc().init()
-    for text, size, weight, color in segments:
-        attrs = {
-            NSFontAttributeName: NSFont.monospacedSystemFontOfSize_weight_(size, weight),
-            NSForegroundColorAttributeName: color,
-        }
+    default_color = NSColor.controlTextColor()
+
+    for seg in segments:
+        text, color, mono = seg
+        attrs = {}
+        if mono:
+            attrs[NSFontAttributeName] = _mono_font(mono)
+        else:
+            attrs[NSFontAttributeName] = _menu_font()
+        attrs[NSForegroundColorAttributeName] = color if color else default_color
         part = NSAttributedString.alloc().initWithString_attributes_(text, attrs)
         result.appendAttributedString_(part)
-    return result
 
-
-def set_item_attr(item, segments):
-    """Set attributed title. segments = [(text, size, weight, color), ...]"""
     try:
-        item._menuitem.setAttributedTitle_(make_attr(segments))
+        item._menuitem.setAttributedTitle_(result)
     except Exception:
         pass
 
@@ -131,7 +138,7 @@ def create_speed_image(rx_speed, tx_speed):
     rx_text = f"↓{fmt_speed_short(rx_speed)}"
     tx_text = f"↑{fmt_speed_short(tx_speed)}"
 
-    font = NSFont.monospacedSystemFontOfSize_weight_(9.0, WEIGHT_BOLD)
+    font = NSFont.monospacedSystemFontOfSize_weight_(9.0, 0.4)
     measure = {NSFontAttributeName: font}
     w1 = NSAttributedString.alloc().initWithString_attributes_(rx_text, measure).size().width
     w2 = NSAttributedString.alloc().initWithString_attributes_(tx_text, measure).size().width
@@ -140,11 +147,9 @@ def create_speed_image(rx_speed, tx_speed):
 
     img = NSImage.alloc().initWithSize_(NSSize(width, height))
     img.lockFocus()
-
-    draw_attrs = {NSFontAttributeName: font, NSForegroundColorAttributeName: CLR_WHITE}
-    NSAttributedString.alloc().initWithString_attributes_(rx_text, draw_attrs).drawAtPoint_(NSMakePoint(0, 10))
-    NSAttributedString.alloc().initWithString_attributes_(tx_text, draw_attrs).drawAtPoint_(NSMakePoint(0, 0))
-
+    draw = {NSFontAttributeName: font, NSForegroundColorAttributeName: NSColor.whiteColor()}
+    NSAttributedString.alloc().initWithString_attributes_(rx_text, draw).drawAtPoint_(NSMakePoint(0, 10))
+    NSAttributedString.alloc().initWithString_attributes_(tx_text, draw).drawAtPoint_(NSMakePoint(0, 0))
     img.unlockFocus()
     img.setTemplate_(False)
     return img
@@ -176,12 +181,6 @@ def save_config(host, port, token):
 
 # ─── Main App ───
 
-SZ = 12.5       # Main font size
-SM = 10.5       # Small font size
-W = WEIGHT_MEDIUM
-WB = WEIGHT_SEMIBOLD
-
-
 class ServerPulseApp(rumps.App):
     def __init__(self):
         super().__init__("ServerPulse", quit_button=None)
@@ -198,61 +197,49 @@ class ServerPulseApp(rumps.App):
         if cfg:
             self.host, self.port, self.token = cfg["host"], cfg["port"], cfg["token"]
 
-        # ── Menu Items ──
+        # Menu Items
         self.header_item = rumps.MenuItem("")
         self.sep1 = rumps.separator
 
-        self.cpu_item = rumps.MenuItem("  CPU   ──")
-        self.mem_item = rumps.MenuItem("  内存  ──")
-        self.disk_item = rumps.MenuItem("  硬盘  ──")
-        self.net_item = rumps.MenuItem("  网络  ──")
+        self.cpu_item = rumps.MenuItem("CPU  ──")
+        self.mem_item = rumps.MenuItem("内存  ──")
+        self.disk_item = rumps.MenuItem("硬盘  ──")
+        self.net_item = rumps.MenuItem("网络  ──")
         self.sep_detail = rumps.separator
-        self.load_item = rumps.MenuItem("  负载  ──")
-        self.uptime_item = rumps.MenuItem("  运行  ──")
+        self.load_item = rumps.MenuItem("负载  ──")
+        self.uptime_item = rumps.MenuItem("运行  ──")
 
         self.sep2 = rumps.separator
-
-        # Traffic section: header + individual time range items
-        self.traffic_header = rumps.MenuItem("📊  流量统计")
-        self.traffic_items = []
-        for _ in range(6):  # today, 1h, 6h, 24h, 7d, 30d
-            item = rumps.MenuItem("")
-            self.traffic_items.append(item)
+        self.traffic_today = rumps.MenuItem("今日流量  ──")
+        self.traffic_total = rumps.MenuItem("累计流量  ──")
 
         self.sep3 = rumps.separator
-        self.connect_item = rumps.MenuItem("🔗  输入连接码", callback=self.on_connect)
-        self.reconnect_item = rumps.MenuItem("🔄  重新连接", callback=self.on_reconnect)
-        self.quit_item = rumps.MenuItem("⏻   退出", callback=self.on_quit)
+        self.connect_item = rumps.MenuItem("🔗 输入连接码", callback=self.on_connect)
+        self.reconnect_item = rumps.MenuItem("🔄 重新连接", callback=self.on_reconnect)
+        self.quit_item = rumps.MenuItem("退出", callback=self.on_quit)
 
-        menu_items = [
+        self.menu = [
             self.header_item, self.sep1,
             self.cpu_item, self.mem_item, self.disk_item, self.net_item,
             self.sep_detail,
             self.load_item, self.uptime_item,
             self.sep2,
-            self.traffic_header,
-        ]
-        menu_items.extend(self.traffic_items)
-        menu_items.extend([
+            self.traffic_today, self.traffic_total,
             self.sep3,
             self.connect_item, self.reconnect_item, self.quit_item,
-        ])
-        self.menu = menu_items
+        ]
 
         if self.host:
-            self.header_item.title = f"  {self.host} · 连接中..."
+            self.header_item.title = f"{self.host} · 连接中..."
         else:
-            self.header_item.title = "  未配置 · 请输入连接码"
+            self.header_item.title = "未配置 · 请输入连接码"
             threading.Timer(1.0, lambda: rumps.Timer(0, lambda _: self.on_connect(None)).start()).start()
 
-    # ── Connection Code ──
     def on_connect(self, _):
         resp = rumps.Window(
             title="ServerPulse",
             message="请粘贴服务器连接码：\n(在服务器运行 install.sh 后获取)",
-            default_text="",
-            ok="连接",
-            cancel="取消",
+            default_text="", ok="连接", cancel="取消",
             dimensions=(360, 24),
         ).run()
         if resp.clicked:
@@ -262,13 +249,12 @@ class ServerPulseApp(rumps.App):
                     h, p, t = decode_connection_code(code)
                     self.host, self.port, self.token = h, p, t
                     save_config(h, p, t)
-                    self.header_item.title = f"  {h} · 连接中..."
+                    self.header_item.title = f"{h} · 连接中..."
                     self._connected = False
                     self._first_data = True
                 except Exception:
                     rumps.alert("错误", "无效的连接码，请检查后重试")
 
-    # ── Polling ──
     @rumps.timer(POLL_INTERVAL)
     def poll(self, _):
         if not self.host or self._collecting:
@@ -309,12 +295,8 @@ class ServerPulseApp(rumps.App):
                 self._nsapp.nsstatusitem.button().setImage_(None)
             except Exception:
                 pass
-            set_item_attr(self.header_item, [
-                (f"  {self.host}", 13, WB, CLR_BLACK),
-                ("  ●  断开", 12, W, CLR_RED),
-            ])
+            self.header_item.title = f"{self.host} · 连接断开"
 
-    # ── UI Update ──
     def _update_ui(self, m):
         net = m.get("net", {})
         rx_speed = net.get("rx_speed", 0)
@@ -328,88 +310,89 @@ class ServerPulseApp(rumps.App):
         except Exception:
             self.title = f"↓{fmt_speed_short(rx_speed)} ↑{fmt_speed_short(tx_speed)}"
 
-        # Header
+        # Header: hostname (ip) ●
         hostname = m.get("hostname", self.host)
-        set_item_attr(self.header_item, [
-            (f"  {hostname}", 13, WB, CLR_BLACK),
-            (f"  ({self.host})", 11, W, CLR_DARK),
-            ("  ●", 11, W, CLR_GREEN),
+        set_title(self.header_item, [
+            (f"{hostname}  ({self.host})  ", None, None),
+            ("●", CLR_GREEN, None),
         ])
 
         # CPU
         cpu_pct = m.get("cpu", {}).get("usage", 0)
-        set_item_attr(self.cpu_item, [
-            ("  CPU    ", SZ, WB, CLR_BLACK),
-            (f"{cpu_pct:5.1f}%  ", SZ, WB, color_for_pct(cpu_pct)),
-            (bar_text(cpu_pct), 9, W, color_for_pct(cpu_pct)),
+        cc = color_for_pct(cpu_pct)
+        set_title(self.cpu_item, [
+            ("CPU   ", None, None),
+            (f"{cpu_pct:.1f}%  ", cc, None),
+            (bar_text(cpu_pct), cc, 9),
         ])
 
         # Memory
         mem = m.get("mem", {})
         mem_pct = mem.get("usage", 0)
-        set_item_attr(self.mem_item, [
-            ("  内存   ", SZ, WB, CLR_BLACK),
-            (f"{mem_pct:5.1f}%  ", SZ, WB, color_for_pct(mem_pct)),
-            (bar_text(mem_pct), 9, W, color_for_pct(mem_pct)),
-            (f"  {fmt_bytes(mem.get('used', 0))}/{fmt_bytes(mem.get('total', 0))}", SM, W, CLR_DARK),
+        mc = color_for_pct(mem_pct)
+        set_title(self.mem_item, [
+            ("内存   ", None, None),
+            (f"{mem_pct:.1f}%  ", mc, None),
+            (bar_text(mem_pct), mc, 9),
+            (f"  {fmt_bytes(mem.get('used', 0))}/{fmt_bytes(mem.get('total', 0))}", None, None),
         ])
 
         # Disk
         disk = m.get("disk", {})
         disk_pct = disk.get("usage", 0)
-        set_item_attr(self.disk_item, [
-            ("  硬盘   ", SZ, WB, CLR_BLACK),
-            (f"{disk_pct:5.1f}%  ", SZ, WB, color_for_pct(disk_pct)),
-            (bar_text(disk_pct), 9, W, color_for_pct(disk_pct)),
-            (f"  {fmt_bytes(disk.get('used', 0))}/{fmt_bytes(disk.get('total', 0))}", SM, W, CLR_DARK),
+        dc = color_for_pct(disk_pct)
+        set_title(self.disk_item, [
+            ("硬盘   ", None, None),
+            (f"{disk_pct:.1f}%  ", dc, None),
+            (bar_text(disk_pct), dc, 9),
+            (f"  {fmt_bytes(disk.get('used', 0))}/{fmt_bytes(disk.get('total', 0))}", None, None),
         ])
 
         # Network
-        set_item_attr(self.net_item, [
-            ("  网络   ", SZ, WB, CLR_BLACK),
-            (f"↓ {fmt_speed(rx_speed)}", SZ, WB, CLR_BLUE),
-            ("  ", SZ, W, CLR_BLACK),
-            (f"↑ {fmt_speed(tx_speed)}", SZ, WB, CLR_RED),
-            (f"  ({net.get('iface', '?')})", SM, W, CLR_DARK),
+        set_title(self.net_item, [
+            ("网络   ", None, None),
+            (f"↓ {fmt_speed(rx_speed)}", CLR_BLUE, None),
+            ("  ", None, None),
+            (f"↑ {fmt_speed(tx_speed)}", CLR_RED, None),
         ])
 
         # Load
         load = m.get("load", {})
-        set_item_attr(self.load_item, [
-            ("  负载   ", SZ, WB, CLR_BLACK),
-            (f"{load.get('1m', '?')}  {load.get('5m', '?')}  {load.get('15m', '?')}", SZ, W, CLR_BLACK),
-        ])
+        self.load_item.title = f"负载   {load.get('1m', '?')}  {load.get('5m', '?')}  {load.get('15m', '?')}"
 
         # Uptime
-        set_item_attr(self.uptime_item, [
-            ("  运行   ", SZ, WB, CLR_BLACK),
-            (m.get("uptime", "N/A"), SZ, W, CLR_BLACK),
-        ])
+        self.uptime_item.title = f"运行   {m.get('uptime', 'N/A')}"
 
         # Traffic
         self._update_traffic()
 
     def _update_traffic(self):
-        set_item_attr(self.traffic_header, [
-            ("📊  流量统计", SZ, WB, CLR_BLACK),
+        from datetime import datetime
+        today_stats = self.traffic_store.get_stats(
+            start_dt=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+            end_dt=datetime.now(),
+        )
+        total_stats = self.traffic_store.get_stats()
+
+        set_title(self.traffic_today, [
+            ("今日流量   ", None, None),
+            (f"↓ {fmt_bytes(today_stats['rx'])}", CLR_BLUE, None),
+            ("  ", None, None),
+            (f"↑ {fmt_bytes(today_stats['tx'])}", CLR_RED, None),
+            (f"  共 {fmt_bytes(today_stats['total'])}", None, None),
         ])
 
-        stats = self.traffic_store.get_predefined_stats()
-        for i, item in enumerate(self.traffic_items):
-            if i < len(stats):
-                s = stats[i]
-                set_item_attr(item, [
-                    (f"    {s['label']:6s}", 11.5, W, CLR_BLACK),
-                    (f"  ↓ {fmt_bytes(s['rx']):>10s}", 11.5, W, CLR_BLUE),
-                    (f"  ↑ {fmt_bytes(s['tx']):>10s}", 11.5, W, CLR_RED),
-                    (f"  Σ {fmt_bytes(s['total']):>10s}", 11.5, WB, CLR_BLACK),
-                ])
-            else:
-                item.title = ""
+        set_title(self.traffic_total, [
+            ("累计流量   ", None, None),
+            (f"↓ {fmt_bytes(total_stats['rx'])}", CLR_BLUE, None),
+            ("  ", None, None),
+            (f"↑ {fmt_bytes(total_stats['tx'])}", CLR_RED, None),
+            (f"  共 {fmt_bytes(total_stats['total'])}", None, None),
+        ])
 
     def on_reconnect(self, _):
         self.title = "⏳"
-        self.header_item.title = f"  {self.host} · 重新连接中..."
+        self.header_item.title = f"{self.host} · 重新连接中..."
         self._connected = False
         self._first_data = True
 
