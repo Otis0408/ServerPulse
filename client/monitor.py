@@ -24,7 +24,7 @@ from traffic_store import TrafficStore
 # ─── Config ───
 CONFIG_DIR = os.path.expanduser("~/Library/Application Support/ServerPulse")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
-POLL_INTERVAL = 3
+POLL_INTERVAL = 5
 
 # Colors for accent elements only
 CLR_GREEN = NSColor.colorWithSRGBRed_green_blue_alpha_(0.15, 0.68, 0.15, 1.0)
@@ -192,6 +192,9 @@ class ServerPulseApp(rumps.App):
         self._collecting = False
         self._connected = False
         self._first_data = True
+        self._last_rx_speed = -1
+        self._last_tx_speed = -1
+        self._cached_speed_image = None
 
         cfg = load_config()
         if cfg:
@@ -274,7 +277,7 @@ class ServerPulseApp(rumps.App):
 
         threading.Thread(target=do_fetch, daemon=True).start()
 
-    @rumps.timer(1)
+    @rumps.timer(POLL_INTERVAL)
     def check_pending(self, _):
         if self._pending is None:
             return
@@ -303,13 +306,18 @@ class ServerPulseApp(rumps.App):
         rx_speed = net.get("rx_speed", 0)
         tx_speed = net.get("tx_speed", 0)
 
-        # Menu bar icon
+        # Menu bar icon (cache image if speed text unchanged)
+        rx_short = fmt_speed_short(rx_speed)
+        tx_short = fmt_speed_short(tx_speed)
         self.title = ""
         try:
-            img = create_speed_image(rx_speed, tx_speed)
-            self._nsapp.nsstatusitem.button().setImage_(img)
+            if rx_short != self._last_rx_speed or tx_short != self._last_tx_speed:
+                self._cached_speed_image = create_speed_image(rx_speed, tx_speed)
+                self._last_rx_speed = rx_short
+                self._last_tx_speed = tx_short
+            self._nsapp.nsstatusitem.button().setImage_(self._cached_speed_image)
         except Exception:
-            self.title = f"↓{fmt_speed_short(rx_speed)} ↑{fmt_speed_short(tx_speed)}"
+            self.title = f"↓{rx_short} ↑{tx_short}"
 
         # Header: hostname (ip) ●
         hostname = m.get("hostname", self.host)

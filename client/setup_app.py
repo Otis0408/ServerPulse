@@ -12,8 +12,8 @@ OPTIONS = {
         "CFBundleName": "ServerPulse",
         "CFBundleDisplayName": "ServerPulse",
         "CFBundleIdentifier": "com.serverpulse.monitor",
-        "CFBundleVersion": "1.0.0",
-        "CFBundleShortVersionString": "1.0.0",
+        "CFBundleVersion": "1.1.0",
+        "CFBundleShortVersionString": "1.1.0",
         "LSMinimumSystemVersion": "11.0",
         "LSUIElement": True,  # Menu bar app, no dock icon
         "NSHighResolutionCapable": True,
